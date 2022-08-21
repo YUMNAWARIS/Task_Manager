@@ -1,25 +1,26 @@
 const User = require('../models/user');
-const jwt = require ("jsonwebtoken")
+const jwt = require ("jsonwebtoken");
+const errorHandler = require('../utils/errorHandler');
 
 // Retriving a user from database
 // Check authorization
 module.exports.login = async (req,res,next)=>{
     const {email,password} = req.body
-    try{
-        const user = await User.login(email,password);
-        if(user){
-            const token = jwt.sign(
-                {user : user}, "Secret Key" , {expiresIn: 3*24*60*60*1000}
-            )
-            res.status(200).json({
-                JWT_Token : token,
-                Message : "Successful Login",
-                user : user
-            })
-        }
-    }catch(error){
-        res.json({error})
-    }
+    User.login(email, password)
+    .then(user=>{
+        const token = jwt.sign(
+            {user : user}, "Secret Key" , {expiresIn: '5h'}
+        )
+        res.status(200).json({
+            // JWT_Token : token,
+            JWT_Token : token,
+            Message : "Successful Login",
+            user : user
+        })
+    })
+    .catch(err=>{
+        next(err)
+    })
 }
 
 // Adding New Users
@@ -41,9 +42,7 @@ module.exports.signup =  (req,res,next)=>{
             })
         })
         .catch (error=>{
-            res.status(400).json({
-                error : error
-            })
+           next(error);
         })
 }
 
@@ -57,7 +56,8 @@ module.exports.logout = (req,res,next)=>{
 // POST '/user/:id
 module.exports.deleteUser = (req,res,next)=>{
     const id = req.params.id
-    User.findOneAndRemove({_id:id})
+    console.log(id);
+    User.findByIdAndRemove(id)
         .then(result=>{
             if(result){
                 res.status(200).json(
@@ -66,16 +66,13 @@ module.exports.deleteUser = (req,res,next)=>{
                         user_id : result._id
                     }
                 )
-            }
-            res.status(404).json({
-                Error : "User not found."
-            })
+            }else{
+                const error = new Error("Incorrect User.")
+                throw error;
+            }    
         })
-        .catch(err=>{
-            console.log(err)
-            res.status(500).json({
-                Error : err
-            })
+        .catch(error=>{
+            next(error);
         })
 }
 
@@ -83,18 +80,17 @@ module.exports.deleteUser = (req,res,next)=>{
 // PUT '/user/:id
 module.exports.updateUser = (req,res,next)=>{
     const id = req.params.id
-    const {name,email} = req.body
+    const {name,password} = req.body
     User.findById(id)
         .then(user=>{
             if(user){
                 user.name = name;
-                user.email = email; 
+                user.password = password; 
                 return user.save()
 
             }else{
-                res.status(400).json({
-                    Error : "User Not Found"
-                })
+                const error = new Error("Incorrect User.")
+                throw error;
             }
         })
         .then(result=>{
@@ -106,14 +102,12 @@ module.exports.updateUser = (req,res,next)=>{
                     user_name : result.name
                 })
             }else{
-                res.status(500).json({
-                    Error : err
-                })
+                const error = new Error("Update Error. Result not Found")
+                throw error;
             }
         })
-        .catch(err=>{
-            res.status(500).json({
-                Error : err
-            })
+        .catch(error=>{
+            next(error)
         })
 }
+

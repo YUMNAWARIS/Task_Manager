@@ -2,6 +2,7 @@ const mongoose = require("mongoose")
 const {isEmail} = require("validator")
 const hashed = require("bcrypt")
 
+// Defining Schema Structure for Model User
 const userSchema = mongoose.Schema({
     name :{ 
         type : String,
@@ -10,7 +11,7 @@ const userSchema = mongoose.Schema({
     email :{
         type : String,
         required :[true, 'E-mail is required.'],
-        unique :[true, 'E-mail is already registered.'],
+        unique :true,
         lowercase : true,
         validate : [isEmail, "Invalid E-mail"]
     },
@@ -34,28 +35,32 @@ const userSchema = mongoose.Schema({
     }]
 })
 
+// Code for Hashing Passwords
 userSchema.pre('save',async function(next){
     const salt = await hashed.genSalt();
     this.password = await hashed.hash(this.password, salt);
     next();
 })
 
+// Defining Login Static Method on Schema User
 userSchema.statics.login =  async function(email,password){
-    try{
+        // Checking if user exists
         const user = await this.findOne({email});
         if(user){
+            // Code for comparing hashed password for authorization
             const isAuth = await hashed.compare(password,user.password);
             if(isAuth){
-                return user
+                return user;
             }else{
-                throw new Error("Authentication failed.")
+                const error = new Error("Incorrect Password.");
+                error.statusCode = 401;
+                throw error;
             }
         }else{
-            throw new Error("User not found.")
+            const error = new Error("Incorrect User.");
+            error.statusCode = 404;
+            throw error;
         }
-    }catch(err){
-        throw new Error(err)
-    }
 }
 
 module.exports = mongoose.model('user',userSchema)
